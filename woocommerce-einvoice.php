@@ -4,8 +4,8 @@
  * Plugin URI: 
  * Description: Extends WooCommerce checkout with additional fields required for Malaysian e-invoicing
  * Version: 1.0.0
- * Author: 
- * Author URI: 
+ * Author: MECACA GLOBAL NETWORK SDN BHD
+ * Author URI: https://mecaca.com
  * Text Domain: wc-einvoice
  * Domain Path: /languages
  * Requires at least: 5.8
@@ -15,9 +15,23 @@
 
 defined('ABSPATH') || exit;
 
-class WC_EInvoice {
+/**
+ * Main WC_EInvoice Class
+ */
+final class WC_EInvoice {
+    /**
+     * Plugin version
+     */
+    public const VERSION = '1.0.0';
+
+    /**
+     * Single instance of the plugin
+     */
     private static $instance = null;
 
+    /**
+     * Main WC_EInvoice Instance
+     */
     public static function instance() {
         if (is_null(self::$instance)) {
             self::$instance = new self();
@@ -25,110 +39,182 @@ class WC_EInvoice {
         return self::$instance;
     }
 
+    /**
+     * WC_EInvoice Constructor
+     */
     public function __construct() {
         $this->define_constants();
+        $this->includes();
         $this->init_hooks();
-
-        // Load required files
-        add_action('plugins_loaded', array($this, 'load_plugin_files'));
     }
 
+    /**
+     * Define plugin constants
+     */
     private function define_constants() {
-        define('WC_EINVOICE_VERSION', '1.0.0');
-        define('WC_EINVOICE_PLUGIN_DIR', plugin_dir_path(__FILE__));
-        define('WC_EINVOICE_PLUGIN_URL', plugin_dir_url(__FILE__));
+        define('WC_EINVOICE_VERSION', self::VERSION);
+        define('WC_EINVOICE_ABSPATH', dirname(__FILE__) . '/');
+        define('WC_EINVOICE_PLUGIN_BASENAME', plugin_basename(__FILE__));
+        define('WC_EINVOICE_PLUGIN_URL', plugins_url('/', __FILE__));
     }
 
+    /**
+     * Include required core files
+     */
+    private function includes() {
+        // Include core files only when WooCommerce is active
+        if ($this->is_woocommerce_active()) {
+            require_once WC_EINVOICE_ABSPATH . 'includes/class-wc-einvoice-install.php';
+            require_once WC_EINVOICE_ABSPATH . 'includes/class-wc-einvoice-checkout-fields.php';
+            require_once WC_EINVOICE_ABSPATH . 'includes/class-wc-einvoice-admin.php';
+            require_once WC_EINVOICE_ABSPATH . 'includes/class-wc-einvoice-customer.php';
+        }
+    }
+
+    /**
+     * Initialize plugin hooks
+     */
     private function init_hooks() {
         // Check if WooCommerce is active
-        if (!class_exists('WooCommerce')) {
+        if (!$this->is_woocommerce_active()) {
             add_action('admin_notices', array($this, 'woocommerce_missing_notice'));
             return;
         }
 
-        // Initialize the plugin
-        add_action('init', array($this, 'init'), 0);
-        
-        // Add menu items
-        add_action('admin_menu', array($this, 'add_admin_menu'));
-        
-        // Database installation
-        register_activation_hook(__FILE__, array($this, 'install'));
+        // Plugin activation and deactivation hooks
+        register_activation_hook(__FILE__, array($this, 'activate'));
+        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+
+        // Initialize plugin
+        add_action('plugins_loaded', array($this, 'init'), 0);
+
+        // Load text domain
+        add_action('init', array($this, 'load_plugin_textdomain'));
+
+        // Add settings link to plugins page
+        add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'add_plugin_links'));
     }
 
-    public function load_plugin_files() {
-        require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-install.php';
-        require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-checkout-fields.php';
-        require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-admin.php';
-        require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-customer.php';
+    /**
+     * Check if WooCommerce is active
+     */
+    private function is_woocommerce_active() {
+        $active_plugins = (array) get_option('active_plugins', array());
+        if (is_multisite()) {
+            $active_plugins = array_merge($active_plugins, get_site_option('active_sitewide_plugins', array()));
+        }
+        return in_array('woocommerce/woocommerce.php', $active_plugins, true) || array_key_exists('woocommerce/woocommerce.php', $active_plugins);
     }
 
-    public function install() {
-        global $wpdb;
-
-        // Create custom table
-        $table_name = $wpdb->prefix . 'wc_einvoice_data';
-        $charset_collate = $wpdb->get_charset_collate();
-
-        $sql = "CREATE TABLE IF NOT EXISTS $table_name (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            user_id bigint(20) NOT NULL,
-            tin_number varchar(50),
-            sst_registration varchar(50),
-            tax_type varchar(50),
-            tax_exemption_details text,
-            registration_number varchar(100),
-            msic_code varchar(50),
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            KEY user_id (user_id)
-        ) $charset_collate;";
-
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
-    }
-
+    /**
+     * Initialize plugin when WooCommerce is active
+     */
     public function init() {
-        // Initialize admin
-        if (is_admin()) {
-            new WC_EInvoice_Admin();
+        if ($this->is_woocommerce_active()) {
+            // Initialize admin
+            if (is_admin()) {
+                new WC_EInvoice_Admin();
+            }
+
+            // Initialize checkout fields
+            new WC_EInvoice_Checkout_Fields();
+
+            // Initialize customer handler
+            new WC_EInvoice_Customer();
+        }
+    }
+
+    /**
+     * Activate plugin
+     */
+    public function activate() {
+        if (!class_exists('WooCommerce')) {
+            deactivate_plugins(plugin_basename(__FILE__));
+            wp_die(__('WooCommerce E-Invoice Extension requires WooCommerce to be installed and active.', 'wc-einvoice'));
         }
 
-        // Initialize customer data handler
-        new WC_EInvoice_Customer();
+        // Install database tables and default settings
+        WC_EInvoice_Install::install();
 
-        // Initialize checkout fields
-        new WC_EInvoice_Checkout_Fields();
+        // Clear the permalinks
+        flush_rewrite_rules();
+
+        do_action('wc_einvoice_activated');
     }
 
-    public function add_admin_menu() {
-        add_menu_page(
-            __('E-Invoice Settings', 'wc-einvoice'),
-            __('E-Invoice', 'wc-einvoice'),
-            'manage_woocommerce',
+    /**
+     * Deactivate plugin
+     */
+    public function deactivate() {
+        flush_rewrite_rules();
+        do_action('wc_einvoice_deactivated');
+    }
+
+    /**
+     * Load plugin text domain
+     */
+    public function load_plugin_textdomain() {
+        load_plugin_textdomain(
             'wc-einvoice',
-            array($this, 'admin_page'),
-            'dashicons-media-spreadsheet',
-            56
+            false,
+            dirname(plugin_basename(__FILE__)) . '/languages/'
         );
     }
 
-    public function admin_page() {
-        require_once WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-admin-page.php';
+    /**
+     * Add plugin action links
+     */
+    public function add_plugin_links($links) {
+        $plugin_links = array(
+            '<a href="' . admin_url('admin.php?page=wc-einvoice-settings') . '">' . __('Settings', 'wc-einvoice') . '</a>',
+            '<a href="' . admin_url('admin.php?page=wc-einvoice-docs') . '">' . __('Documentation', 'wc-einvoice') . '</a>'
+        );
+        return array_merge($plugin_links, $links);
     }
 
+    /**
+     * WooCommerce missing notice
+     */
     public function woocommerce_missing_notice() {
-        echo '<div class="error"><p>' . 
-             __('WooCommerce E-Invoice Extension requires WooCommerce to be installed and active.', 'wc-einvoice') . 
-             '</p></div>';
+        if (current_user_can('activate_plugins')) {
+            echo '<div class="error"><p>';
+            printf(
+                /* translators: %s: WooCommerce installation URL */
+                __('WooCommerce E-Invoice Extension requires WooCommerce to be installed and activated. You can download %s here.', 'wc-einvoice'),
+                '<a href="' . esc_url(admin_url('plugin-install.php?tab=plugin-information&plugin=woocommerce')) . '">WooCommerce</a>'
+            );
+            echo '</p></div>';
+        }
+    }
+
+    /**
+     * Get plugin URL
+     */
+    public function plugin_url() {
+        return untrailingslashit(plugins_url('/', __FILE__));
+    }
+
+    /**
+     * Get plugin path
+     */
+    public function plugin_path() {
+        return untrailingslashit(plugin_dir_path(__FILE__));
+    }
+
+    /**
+     * Get template path
+     */
+    public function template_path() {
+        return apply_filters('wc_einvoice_template_path', 'woocommerce-einvoice/');
     }
 }
 
-// Initialize the plugin
+/**
+ * Main instance of WC_EInvoice
+ */
 function WC_EInvoice() {
     return WC_EInvoice::instance();
 }
 
-// Start the plugin
-WC_EInvoice();
+// Global for backwards compatibility
+$GLOBALS['wc_einvoice'] = WC_EInvoice();
