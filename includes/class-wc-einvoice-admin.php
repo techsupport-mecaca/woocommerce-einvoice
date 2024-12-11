@@ -160,4 +160,50 @@ class WC_EInvoice_Admin {
 
         return $sanitized;
     }
+    public function add_menu_items() {
+    // Main menu
+    add_menu_page(
+        __('E-Invoice', 'wc-einvoice'),
+        __('E-Invoice', 'wc-einvoice'),
+        'manage_options',  // Changed from manage_woocommerce to manage_options
+        'wc-einvoice',
+        array($this, 'render_admin_page'),
+        'dashicons-media-spreadsheet',
+        56
+    );
+
+    // Settings submenu
+    add_submenu_page(
+        'wc-einvoice',
+        __('E-Invoice Settings', 'wc-einvoice'),
+        __('Settings', 'wc-einvoice'),
+        'manage_options',  // Changed from manage_woocommerce to manage_options
+        'wc-einvoice-settings',
+        array($this, 'render_settings_page')
+    );
+
+    // Payment settings submenu
+    add_submenu_page(
+        'wc-einvoice',
+        __('Payment Settings', 'wc-einvoice'),
+        __('Payment', 'wc-einvoice'),
+        'manage_options',  // Changed from manage_woocommerce to manage_options
+        'wc-einvoice-payment',
+        array($this, 'render_payment_page')
+    );
+
+    // Bulk management submenu
+    add_submenu_page(
+        'wc-einvoice',
+        __('Bulk Management', 'wc-einvoice'),
+        __('Bulk Management', 'wc-einvoice'),
+        'manage_options',  // Changed from manage_woocommerce to manage_options
+        'wc-einvoice-bulk',
+        array($this, 'render_bulk_page')
+    );
+}
+
+public function render_admin_page() {
+    require_once WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-admin-page.php';
+}
 }
