@@ -1,16 +1,18 @@
 <?php
 /**
- * Plugin Name: WooCommerce E-Invoice
+ * Plugin Name: WooCommerce E-Invoice Extension
  * Plugin URI: 
  * Description: Extends WooCommerce checkout with additional fields required for Malaysian e-invoicing
  * Version: 1.0.0
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
  * Author: MECACA GLOBAL NETWORK SDN BHD
  * Author URI: https://mecaca.com
  * Text Domain: wc-einvoice
  * Domain Path: /languages
- * Requires at least: 5.8
- * Requires PHP: 7.4
  * WC requires at least: 5.0
+ * WC tested up to: 8.4
+ * License: GPL v2 or later
  */
 
 defined('ABSPATH') || exit;
@@ -27,49 +29,49 @@ final class WC_EInvoice {
     }
 
     public function __construct() {
+        if (self::$instance !== null) {
+            return;
+        }
+
         $this->define_constants();
 
-        // Initialize plugin after WooCommerce is loaded
-        add_action('plugins_loaded', array($this, 'init'), 0);
+        // Load plugin after WooCommerce
+        add_action('plugins_loaded', array($this, 'init'), 15);
 
         // Register activation and deactivation hooks
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
 
-        // Load text domain
-        add_action('init', array($this, 'load_plugin_textdomain'));
+        // Add settings link in plugins page
+        add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'add_settings_link'));
     }
 
     private function define_constants() {
-        if (!defined('WC_EINVOICE_VERSION')) {
-            define('WC_EINVOICE_VERSION', self::VERSION);
-        }
-        if (!defined('WC_EINVOICE_PLUGIN_DIR')) {
-            define('WC_EINVOICE_PLUGIN_DIR', plugin_dir_path(__FILE__));
-        }
-        if (!defined('WC_EINVOICE_PLUGIN_URL')) {
-            define('WC_EINVOICE_PLUGIN_URL', plugin_dir_url(__FILE__));
-        }
-        if (!defined('WC_EINVOICE_PLUGIN_BASENAME')) {
-            define('WC_EINVOICE_PLUGIN_BASENAME', plugin_basename(__FILE__));
-        }
-        if (!defined('WC_EINVOICE_TEMPLATE_PATH')) {
-            define('WC_EINVOICE_TEMPLATE_PATH', 'woocommerce-einvoice/');
-        }
+        define('WC_EINVOICE_VERSION', self::VERSION);
+        define('WC_EINVOICE_PLUGIN_DIR', plugin_dir_path(__FILE__));
+        define('WC_EINVOICE_PLUGIN_URL', plugin_dir_url(__FILE__));
+        define('WC_EINVOICE_PLUGIN_BASENAME', plugin_basename(__FILE__));
     }
 
     public function init() {
-        if (!$this->check_dependencies()) {
+        // Check if WooCommerce is active
+        if (!$this->check_woocommerce()) {
             return;
         }
 
+        // Load translations
+        load_plugin_textdomain('wc-einvoice', false, dirname(WC_EINVOICE_PLUGIN_BASENAME) . '/languages');
+
+        // Include required files
         $this->includes();
+
+        // Initialize hooks
         $this->init_hooks();
 
         do_action('wc_einvoice_loaded');
     }
 
-    private function check_dependencies() {
+    private function check_woocommerce() {
         if (!class_exists('WooCommerce')) {
             add_action('admin_notices', array($this, 'woocommerce_missing_notice'));
             return false;
@@ -77,33 +79,50 @@ final class WC_EInvoice {
         return true;
     }
 
+    public function woocommerce_missing_notice() {
+        if (current_user_can('activate_plugins')) {
+            echo '<div class="error"><p>';
+            printf(
+                /* translators: %s: WooCommerce plugin URL */
+                esc_html__('WooCommerce E-Invoice Extension requires WooCommerce to be installed and active. You can download %s here.', 'wc-einvoice'),
+                '<a href="' . esc_url(admin_url('plugin-install.php?tab=plugin-information&plugin=woocommerce')) . '">WooCommerce</a>'
+            );
+            echo '</p></div>';
+        }
+    }
+
     private function includes() {
+        // Core files
         require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-install.php';
-        require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-admin.php';
         require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-checkout-fields.php';
         require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-customer.php';
 
+        // Admin includes
         if (is_admin()) {
+            require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-admin.php';
             new WC_EInvoice_Admin();
         }
+    }
 
+    private function init_hooks() {
+        add_action('init', array($this, 'init_handlers'), 0);
+        add_action('widgets_init', array($this, 'init_widgets'));
+        add_filter('woocommerce_get_settings_pages', array($this, 'init_settings'));
+    }
+
+    public function init_handlers() {
+        // Initialize core handlers
         new WC_EInvoice_Checkout_Fields();
         new WC_EInvoice_Customer();
     }
 
-    private function init_hooks() {
-        add_filter(
-            'plugin_action_links_' . WC_EINVOICE_PLUGIN_BASENAME,
-            array($this, 'plugin_action_links')
-        );
+    public function init_widgets() {
+        // Register widgets if needed
     }
 
-    public function plugin_action_links($links) {
-        $plugin_links = array(
-            '<a href="' . admin_url('admin.php?page=wc-einvoice-settings') . '">' . 
-            __('Settings', 'wc-einvoice') . '</a>'
-        );
-        return array_merge($plugin_links, $links);
+    public function init_settings($settings) {
+        // Add settings if needed
+        return $settings;
     }
 
     public function activate() {
@@ -111,18 +130,19 @@ final class WC_EInvoice {
             deactivate_plugins(plugin_basename(__FILE__));
             wp_die(
                 esc_html__('WooCommerce E-Invoice Extension requires WooCommerce to be installed and active.', 'wc-einvoice'),
-                'Plugin dependency check',
+                'Plugin Activation Error',
                 array('back_link' => true)
             );
         }
 
-        if (!class_exists('WC_EInvoice_Install')) {
-            require_once WC_EINVOICE_PLUGIN_DIR . 'includes/class-wc-einvoice-install.php';
+        // Run installation
+        if (class_exists('WC_EInvoice_Install')) {
+            WC_EInvoice_Install::install();
         }
 
-        WC_EInvoice_Install::install();
-
+        // Clear permalinks
         flush_rewrite_rules();
+
         do_action('wc_einvoice_activated');
     }
 
@@ -131,29 +151,23 @@ final class WC_EInvoice {
         do_action('wc_einvoice_deactivated');
     }
 
-    public function load_plugin_textdomain() {
-        load_plugin_textdomain(
-            'wc-einvoice',
-            false,
-            dirname(WC_EINVOICE_PLUGIN_BASENAME) . '/languages'
-        );
+    public function add_settings_link($links) {
+        $settings_link = '<a href="' . admin_url('admin.php?page=wc-einvoice') . '">' . 
+                        esc_html__('Settings', 'wc-einvoice') . '</a>';
+        array_unshift($links, $settings_link);
+        return $links;
     }
 
-    public function woocommerce_missing_notice() {
-        if (current_user_can('activate_plugins')) {
-            printf(
-                '<div class="error"><p>%s</p></div>',
-                sprintf(
-                    /* translators: %s: WooCommerce plugin link */
-                    esc_html__('WooCommerce E-Invoice Extension requires WooCommerce to be installed and active. You can download %s here.', 'wc-einvoice'),
-                    '<a href="' . esc_url(admin_url('plugin-install.php?tab=plugin-information&plugin=woocommerce')) . '">WooCommerce</a>'
-                )
-            );
-        }
+    public function plugin_url() {
+        return untrailingslashit(plugins_url('/', __FILE__));
     }
 
-    public function get_template_path() {
-        return WC_EINVOICE_TEMPLATE_PATH;
+    public function plugin_path() {
+        return untrailingslashit(plugin_dir_path(__FILE__));
+    }
+
+    public function template_path() {
+        return apply_filters('wc_einvoice_template_path', 'woocommerce-einvoice/');
     }
 }
 
