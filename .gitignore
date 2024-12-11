@@ -1,0 +1,25 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# IDE Files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Development Files
+node_modules/
+vendor/
+composer.lock
+package-lock.json
+
+# WordPress Development
+wp-config.php
+wp-content/uploads/
+wp-content/upgrade/
+
+# Plugin Specific
+*.log
+*.bak
+*.zip
