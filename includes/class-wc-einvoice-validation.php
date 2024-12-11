@@ -1,199 +1,114 @@
 <?php
-defined('ABSPATH') || exit;
+class WC_EInvoice_Advanced_Validation extends WC_EInvoice_Validation {
+    protected $custom_rules = array();
 
-class WC_EInvoice_Validation {
-    private $errors = array();
-    
     public function __construct() {
-        // Register validation hooks
-        add_filter('woocommerce_checkout_posted_data', array($this, 'validate_checkout_fields'));
-        add_action('woocommerce_checkout_process', array($this, 'process_checkout_validation'));
+        parent::__construct();
+        $this->init_custom_rules();
         
-        // Register integration hooks
-        add_action('wc_einvoice_before_save_data', array($this, 'before_save_action'));
-        add_action('wc_einvoice_after_save_data', array($this, 'after_save_action'));
-        add_filter('wc_einvoice_data', array($this, 'filter_einvoice_data'), 10, 2);
-        
-        // Error handling
-        add_action('admin_notices', array($this, 'display_admin_errors'));
-        add_action('woocommerce_notices', array($this, 'display_frontend_errors'));
+        add_filter('wc_einvoice_validation_rules', array($this, 'add_custom_validation_rules'));
     }
 
-    /**
-     * Validate checkout fields
-     */
-    public function validate_checkout_fields($posted_data) {
-        try {
-            // Allow third-party validation rules
-            $validation_rules = apply_filters('wc_einvoice_validation_rules', array(
-                'billing_tin' => array(
-                    'required' => true,
-                    'type' => 'string',
-                    'min_length' => 5,
-                    'max_length' => 20
-                ),
-                'billing_sst_registration' => array(
-                    'required' => true,
-                    'type' => 'string',
-                    'min_length' => 5,
-                    'max_length' => 20
-                ),
-                'billing_registration_number' => array(
-                    'required' => true,
-                    'type' => 'string',
-                    'min_length' => 5,
-                    'max_length' => 30
-                )
-            ));
+    protected function init_custom_rules() {
+        $this->custom_rules = array(
+            'tin_format' => array(
+                'callback' => array($this, 'validate_tin_format'),
+                'error_message' => __('Invalid TIN format. Please check and try again.', 'wc-einvoice')
+            ),
+            'sst_format' => array(
+                'callback' => array($this, 'validate_sst_format'),
+                'error_message' => __('Invalid SST registration format. Please check and try again.', 'wc-einvoice')
+            ),
+            'registration_format' => array(
+                'callback' => array($this, 'validate_registration_format'),
+                'error_message' => __('Invalid registration number format. Please check and try again.', 'wc-einvoice')
+            )
+        );
+    }
 
-            foreach ($validation_rules as $field => $rules) {
-                if (isset($posted_data[$field])) {
-                    $this->validate_field($field, $posted_data[$field], $rules);
+    public function add_custom_validation_rules($rules) {
+        return array_merge($rules, array(
+            'billing_tin' => array(
+                'required' => true,
+                'type' => 'string',
+                'min_length' => 5,
+                'max_length' => 20,
+                'custom_rules' => array('tin_format')
+            ),
+            'billing_sst_registration' => array(
+                'required' => true,
+                'type' => 'string',
+                'min_length' => 5,
+                'max_length' => 20,
+                'custom_rules' => array('sst_format')
+            ),
+            'billing_registration_number' => array(
+                'required' => true,
+                'type' => 'string',
+                'min_length' => 5,
+                'max_length' => 30,
+                'custom_rules' => array('registration_format')
+            )
+        ));
+    }
+
+    protected function validate_tin_format($value) {
+        // Implement specific TIN format validation for Malaysia
+        $pattern = '/^[0-9]{9,12}$/'; // Example pattern
+        return preg_match($pattern, $value);
+    }
+
+    protected function validate_sst_format($value) {
+        // Implement specific SST registration format validation
+        $pattern = '/^SST-[0-9]{6,10}$/i'; // Example pattern
+        return preg_match($pattern, $value);
+    }
+
+    protected function validate_registration_format($value) {
+        // Implement specific registration number format validation
+        $pattern = '/^[A-Z0-9]{5,15}$/'; // Example pattern
+        return preg_match($pattern, $value);
+    }
+
+    public function validate_field($field, $value, $rules) {
+        parent::validate_field($field, $value, $rules);
+
+        // Apply custom validation rules
+        if (!empty($rules['custom_rules'])) {
+            foreach ($rules['custom_rules'] as $rule_name) {
+                if (isset($this->custom_rules[$rule_name])) {
+                    $rule = $this->custom_rules[$rule_name];
+                    if (!call_user_func($rule['callback'], $value)) {
+                        throw new Exception($rule['error_message']);
+                    }
                 }
             }
-
-            // Allow third-party validation
-            do_action('wc_einvoice_custom_validation', $posted_data, $this);
-
-            return $posted_data;
-
-        } catch (Exception $e) {
-            wc_add_notice($e->getMessage(), 'error');
-            return $posted_data;
         }
     }
 
-    /**
-     * Validate individual field
-     */
-    private function validate_field($field, $value, $rules) {
-        // Required field validation
-        if (!empty($rules['required']) && empty($value)) {
-            throw new Exception(sprintf(
-                __('Field %s is required.', 'wc-einvoice'),
-                $this->get_field_label($field)
-            ));
-        }
-
-        // Type validation
-        if (!empty($rules['type'])) {
-            switch ($rules['type']) {
-                case 'number':
-                    if (!is_numeric($value)) {
-                        throw new Exception(sprintf(
-                            __('Field %s must be a number.', 'wc-einvoice'),
-                            $this->get_field_label($field)
-                        ));
-                    }
-                    break;
-                case 'email':
-                    if (!is_email($value)) {
-                        throw new Exception(sprintf(
-                            __('Field %s must be a valid email address.', 'wc-einvoice'),
-                            $this->get_field_label($field)
-                        ));
-                    }
-                    break;
-            }
-        }
-
-        // Length validation
-        if (!empty($rules['min_length']) && strlen($value) < $rules['min_length']) {
-            throw new Exception(sprintf(
-                __('Field %s must be at least %d characters.', 'wc-einvoice'),
-                $this->get_field_label($field),
-                $rules['min_length']
-            ));
-        }
-
-        if (!empty($rules['max_length']) && strlen($value) > $rules['max_length']) {
-            throw new Exception(sprintf(
-                __('Field %s must not exceed %d characters.', 'wc-einvoice'),
-                $this->get_field_label($field),
-                $rules['max_length']
-            ));
-        }
-
-        // Allow custom validation per field
-        do_action('wc_einvoice_field_validation', $field, $value, $rules);
-    }
-
-    /**
-     * Process checkout validation
-     */
-    public function process_checkout_validation() {
-        if (!empty($this->errors)) {
-            foreach ($this->errors as $error) {
-                wc_add_notice($error, 'error');
+    public function validate_dependent_fields($data) {
+        // Example of dependent field validation
+        if (!empty($data['billing_tax_type']) && $data['billing_tax_type'] === 'sst') {
+            if (empty($data['billing_sst_registration'])) {
+                throw new Exception(__('SST Registration Number is required when tax type is SST.', 'wc-einvoice'));
             }
         }
     }
 
-    /**
-     * Integration hooks for before saving data
-     */
-    public function before_save_action($data) {
-        do_action('wc_einvoice_before_process_data', $data);
-        
-        // Allow data modification before save
-        $data = apply_filters('wc_einvoice_pre_save_data', $data);
-        
-        return $data;
-    }
-
-    /**
-     * Integration hooks for after saving data
-     */
-    public function after_save_action($data) {
-        do_action('wc_einvoice_after_process_data', $data);
-        
-        // Notify third-party integrations
-        do_action('wc_einvoice_data_saved', $data);
-    }
-
-    /**
-     * Filter e-invoice data
-     */
-    public function filter_einvoice_data($data, $context = '') {
-        // Allow third-party modifications
-        return apply_filters('wc_einvoice_filtered_data', $data, $context);
-    }
-
-    /**
-     * Display admin errors
-     */
-    public function display_admin_errors() {
-        $screen = get_current_screen();
-        
-        if ($screen && strpos($screen->id, 'wc-einvoice') !== false) {
-            settings_errors('wc_einvoice_notices');
+    public function sanitize_field($value, $field) {
+        // Add specific sanitization rules per field
+        switch ($field) {
+            case 'billing_tin':
+                return preg_replace('/[^0-9]/', '', $value);
+            
+            case 'billing_sst_registration':
+                return strtoupper(trim($value));
+            
+            case 'billing_registration_number':
+                return strtoupper(trim($value));
+            
+            default:
+                return sanitize_text_field($value);
         }
-    }
-
-    /**
-     * Display frontend errors
-     */
-    public function display_frontend_errors() {
-        if (!empty($this->errors)) {
-            foreach ($this->errors as $error) {
-                wc_print_notice($error, 'error');
-            }
-        }
-    }
-
-    /**
-     * Get field label for error messages
-     */
-    private function get_field_label($field) {
-        $labels = array(
-            'billing_tin' => __('Tax Identification Number', 'wc-einvoice'),
-            'billing_sst_registration' => __('SST Registration', 'wc-einvoice'),
-            'billing_registration_number' => __('Registration Number', 'wc-einvoice')
-        );
-
-        return isset($labels[$field]) ? $labels[$field] : $field;
     }
 }
-
-// Initialize validation
-new WC_EInvoice_Validation();
