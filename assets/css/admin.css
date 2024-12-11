@@ -1,16 +1,18 @@
-/* WooCommerce E-Invoice Admin Styles */
-
+/* Admin Panel Styles */
 .wc-einvoice-settings {
     max-width: 1200px;
-    margin: 20px auto;
+    margin: 20px 0;
+}
+
+.wc-einvoice-settings .nav-tab-wrapper {
+    margin-bottom: 20px;
 }
 
 .wc-einvoice-settings .form-table {
     background: #fff;
-    border: 1px solid #ccd0d4;
-    border-radius: 4px;
     padding: 20px;
-    margin-top: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
 .wc-einvoice-settings .form-table th {
@@ -26,50 +28,48 @@
     width: 200px;
 }
 
-.wc-einvoice-bulk .hidden {
+.wc-einvoice-bulk .edit-mode.hidden {
     display: none;
 }
 
-.wc-einvoice-bulk .edit-mode input,
-.wc-einvoice-bulk .edit-mode select {
+.wc-einvoice-bulk .view-mode {
+    display: inline-block;
+    padding: 6px 0;
+}
+
+.wc-einvoice-payment .large-text {
     width: 100%;
-    max-width: 250px;
+    max-width: 400px;
 }
 
 /* Status Indicators */
 .einvoice-status {
     display: inline-block;
-    padding: 3px 8px;
+    padding: 4px 8px;
     border-radius: 3px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
 }
 
-.einvoice-status.complete {
-    background: #c6e1c6;
-    color: #5b841b;
+.einvoice-status.success {
+    background: #edfaef;
+    color: #1a472a;
 }
 
 .einvoice-status.pending {
-    background: #f8dda7;
-    color: #94660c;
+    background: #fef8e8;
+    color: #8a6d3b;
 }
 
 .einvoice-status.error {
-    background: #eba3a3;
-    color: #761919;
-}
-
-/* Settings Tabs */
-.nav-tab-wrapper {
-    margin-bottom: 20px;
+    background: #fbeaea;
+    color: #a94442;
 }
 
 /* Form Elements */
 .wc-einvoice-settings input[type="text"],
-.wc-einvoice-settings select,
-.wc-einvoice-settings textarea {
-    min-width: 350px;
+.wc-einvoice-settings select {
+    min-width: 250px;
 }
 
 .wc-einvoice-settings textarea {
@@ -77,30 +77,16 @@
 }
 
 /* Bulk Management Table */
-.wc-einvoice-bulk .wp-list-table .check-column {
-    width: 2%;
+.wp-list-table .check-column {
+    width: 2.2em;
 }
 
-.wc-einvoice-bulk .wp-list-table .column-customer {
+.wp-list-table .column-customer {
     width: 20%;
 }
 
-.wc-einvoice-bulk .wp-list-table th,
-.wc-einvoice-bulk .wp-list-table td {
-    padding: 12px;
-}
-
-/* Notice Styling */
-.wc-einvoice-notice {
-    margin: 15px 0;
-    padding: 10px 15px;
-    border-left: 4px solid #46b450;
-    background: #fff;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-}
-
-.wc-einvoice-notice.error {
-    border-left-color: #dc3232;
+.wp-list-table .column-updated {
+    width: 15%;
 }
 
 /* Loading States */
@@ -121,10 +107,10 @@
     border: 2px solid #f3f3f3;
     border-top: 2px solid #3498db;
     border-radius: 50%;
-    animation: einvoice-spin 1s linear infinite;
+    animation: spin 1s linear infinite;
 }
 
-@keyframes einvoice-spin {
+@keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
