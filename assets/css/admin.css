@@ -1,45 +1,96 @@
-/* Admin Panel Styles */
-.wc-einvoice-settings {
+/**
+ * WooCommerce E-Invoice Admin Styles
+ * Version: 1.0.0
+ */
+
+/* Main Layout */
+.wc-einvoice-container {
     max-width: 1200px;
     margin: 20px 0;
+    padding: 0 20px;
 }
 
-.wc-einvoice-settings .nav-tab-wrapper {
+/* Navigation Tabs */
+.wc-einvoice-tabs {
     margin-bottom: 20px;
+    border-bottom: 1px solid #ccc;
+    background: #fff;
 }
 
-.wc-einvoice-settings .form-table {
+.wc-einvoice-tabs .nav-tab {
+    margin-left: 0;
+    margin-right: 0.5em;
+    padding: 10px 15px;
+    font-size: 14px;
+    line-height: 1.71428571;
+}
+
+.wc-einvoice-tabs .nav-tab-active {
+    border-bottom: 1px solid #fff;
+    background: #fff;
+}
+
+/* Settings Form */
+.wc-einvoice-settings-form {
     background: #fff;
     padding: 20px;
     border: 1px solid #ccd0d4;
-    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
-.wc-einvoice-settings .form-table th {
+.wc-einvoice-settings-form .form-table {
+    margin-top: 0;
+}
+
+.wc-einvoice-settings-form .form-table th {
     padding: 20px;
-    width: 200px;
+    width: 250px;
 }
 
-.wc-einvoice-bulk table {
-    margin-top: 20px;
+.wc-einvoice-settings-form .form-table td {
+    padding: 20px;
 }
 
-.wc-einvoice-bulk .column-actions {
-    width: 200px;
+/* Input Fields */
+.wc-einvoice-settings-form input[type="text"],
+.wc-einvoice-settings-form input[type="number"],
+.wc-einvoice-settings-form select {
+    width: 350px;
+    max-width: 100%;
+    padding: 8px;
+    border-radius: 4px;
 }
 
-.wc-einvoice-bulk .edit-mode.hidden {
-    display: none;
-}
-
-.wc-einvoice-bulk .view-mode {
-    display: inline-block;
-    padding: 6px 0;
-}
-
-.wc-einvoice-payment .large-text {
+.wc-einvoice-settings-form textarea {
     width: 100%;
-    max-width: 400px;
+    min-height: 100px;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+/* Bulk Management Table */
+.wc-einvoice-table {
+    width: 100%;
+    border-spacing: 0;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.wc-einvoice-table th,
+.wc-einvoice-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ccd0d4;
+}
+
+.wc-einvoice-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.wc-einvoice-table tr:hover {
+    background: #f8f9fa;
 }
 
 /* Status Indicators */
@@ -51,48 +102,47 @@
     font-weight: 500;
 }
 
-.einvoice-status.success {
+.einvoice-status-success {
     background: #edfaef;
     color: #1a472a;
 }
 
-.einvoice-status.pending {
-    background: #fef8e8;
+.einvoice-status-pending {
+    background: #fff8e5;
     color: #8a6d3b;
 }
 
-.einvoice-status.error {
+.einvoice-status-error {
     background: #fbeaea;
     color: #a94442;
 }
 
-/* Form Elements */
-.wc-einvoice-settings input[type="text"],
-.wc-einvoice-settings select {
-    min-width: 250px;
+/* Action Buttons */
+.wc-einvoice-action {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 0 4px;
+    border-radius: 3px;
+    text-decoration: none;
+    cursor: pointer;
 }
 
-.wc-einvoice-settings textarea {
-    min-height: 100px;
+.wc-einvoice-action-primary {
+    background: #007cba;
+    color: #fff;
+    border: 1px solid #006ba1;
 }
 
-/* Bulk Management Table */
-.wp-list-table .check-column {
-    width: 2.2em;
-}
-
-.wp-list-table .column-customer {
-    width: 20%;
-}
-
-.wp-list-table .column-updated {
-    width: 15%;
+.wc-einvoice-action-secondary {
+    background: #f8f9fa;
+    color: #1d2327;
+    border: 1px solid #ccd0d4;
 }
 
 /* Loading States */
 .wc-einvoice-loading {
     position: relative;
-    opacity: 0.6;
+    opacity: 0.7;
     pointer-events: none;
 }
 
@@ -105,12 +155,46 @@
     height: 20px;
     margin: -10px 0 0 -10px;
     border: 2px solid #f3f3f3;
-    border-top: 2px solid #3498db;
+    border-top: 2px solid #007cba;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: wc-einvoice-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes wc-einvoice-spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Notice Messages */
+.wc-einvoice-notice {
+    padding: 12px;
+    margin: 5px 0 15px;
+    border-left: 4px solid #000;
+    background: #fff;
+}
+
+.wc-einvoice-notice-success {
+    border-left-color: #46b450;
+}
+
+.wc-einvoice-notice-error {
+    border-left-color: #dc3232;
+}
+
+.wc-einvoice-notice-warning {
+    border-left-color: #ffb900;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 782px) {
+    .wc-einvoice-settings-form .form-table th {
+        width: auto;
+        padding: 10px 0;
+    }
+    
+    .wc-einvoice-settings-form input[type="text"],
+    .wc-einvoice-settings-form input[type="number"],
+    .wc-einvoice-settings-form select {
+        width: 100%;
+    }
 }
