@@ -3,43 +3,60 @@ defined('ABSPATH') || exit;
 
 class WC_EInvoice_Admin {
     public function __construct() {
-        // Add admin menu items
-        add_action('admin_menu', array($this, 'add_submenu_pages'));
-        
-        // Register admin scripts and styles
+        add_action('admin_init', array($this, 'register_settings'));
+        add_action('admin_menu', array($this, 'add_menu_items'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
-        
-        // Ajax handlers for bulk operations
-        add_action('wp_ajax_bulk_export_einvoice_data', array($this, 'handle_bulk_export'));
-        add_action('wp_ajax_bulk_update_einvoice_data', array($this, 'handle_bulk_update'));
-        
-        // Add custom columns to orders list
-        add_filter('manage_edit-shop_order_columns', array($this, 'add_order_columns'));
-        add_action('manage_shop_order_posts_custom_column', array($this, 'add_order_column_content'));
     }
 
-    public function add_submenu_pages() {
-        // Main settings page
+    public function register_settings() {
+        register_setting(
+            'wc_einvoice_settings',
+            'wc_einvoice_settings',
+            array(
+                'type' => 'array',
+                'sanitize_callback' => array($this, 'sanitize_settings')
+            )
+        );
+
+        register_setting(
+            'wc_einvoice_payment_settings',
+            'wc_einvoice_payment_settings',
+            array(
+                'type' => 'array',
+                'sanitize_callback' => array($this, 'sanitize_payment_settings')
+            )
+        );
+    }
+
+    public function add_menu_items() {
+        add_menu_page(
+            __('E-Invoice Settings', 'wc-einvoice'),
+            __('E-Invoice', 'wc-einvoice'),
+            'manage_woocommerce',
+            'wc-einvoice',
+            array($this, 'render_settings_page'),
+            'dashicons-media-spreadsheet',
+            56
+        );
+
         add_submenu_page(
             'wc-einvoice',
-            __('E-Invoice Settings', 'wc-einvoice'),
+            __('Settings', 'wc-einvoice'),
             __('Settings', 'wc-einvoice'),
             'manage_woocommerce',
-            'wc-einvoice-settings',
+            'wc-einvoice',
             array($this, 'render_settings_page')
         );
 
-        // Payment information management
         add_submenu_page(
             'wc-einvoice',
-            __('Payment Information', 'wc-einvoice'),
-            __('Payment Info', 'wc-einvoice'),
+            __('Payment Settings', 'wc-einvoice'),
+            __('Payment Settings', 'wc-einvoice'),
             'manage_woocommerce',
             'wc-einvoice-payment',
             array($this, 'render_payment_page')
         );
 
-        // Bulk management page
         add_submenu_page(
             'wc-einvoice',
             __('Bulk Management', 'wc-einvoice'),
@@ -51,7 +68,6 @@ class WC_EInvoice_Admin {
     }
 
     public function enqueue_admin_assets($hook) {
-        // Only load on our plugin pages
         if (strpos($hook, 'wc-einvoice') === false) {
             return;
         }
@@ -73,197 +89,75 @@ class WC_EInvoice_Admin {
 
         wp_localize_script('wc-einvoice-admin', 'wcEinvoiceAdmin', array(
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('wc-einvoice-admin'),
-            'bulk_export_error' => __('Error exporting data. Please try again.', 'wc-einvoice'),
-            'bulk_update_error' => __('Error updating data. Please try again.', 'wc-einvoice')
+            'nonce' => wp_create_nonce('wc-einvoice-admin')
         ));
     }
 
     public function render_settings_page() {
-        include WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-settings-page.php';
+        require_once WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-settings-page.php';
     }
 
     public function render_payment_page() {
-        // Get saved payment settings
-        $payment_settings = get_option('wc_einvoice_payment_settings', array());
-        include WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-payment-page.php';
+        require_once WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-payment-page.php';
     }
 
     public function render_bulk_page() {
-        global $wpdb;
-        
-        // Get all e-invoice data
-        $table_name = $wpdb->prefix . 'wc_einvoice_data';
-        $records = $wpdb->get_results("SELECT * FROM {$table_name} ORDER BY updated_at DESC");
-        
-        include WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-bulk-page.php';
+        require_once WC_EINVOICE_PLUGIN_DIR . 'admin/views/html-bulk-page.php';
     }
 
-    public function handle_bulk_export() {
-        check_ajax_referer('wc-einvoice-admin', 'nonce');
-
-        if (!current_user_can('manage_woocommerce')) {
-            wp_die(-1);
-        }
-
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'wc_einvoice_data';
+    public function sanitize_settings($input) {
+        $sanitized = array();
         
-        // Get all records
-        $records = $wpdb->get_results("SELECT * FROM {$table_name}", ARRAY_A);
-        
-        // Generate CSV
-        $filename = 'einvoice-export-' . date('Y-m-d') . '.csv';
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        
-        $output = fopen('php://output', 'w');
-        
-        // Add headers
-        fputcsv($output, array_keys($records[0]));
-        
-        // Add data
-        foreach ($records as $record) {
-            fputcsv($output, $record);
+        if (isset($input['company_name'])) {
+            $sanitized['company_name'] = sanitize_text_field($input['company_name']);
         }
         
-        fclose($output);
-        wp_die();
+        if (isset($input['tax_registration'])) {
+            $sanitized['tax_registration'] = sanitize_text_field($input['tax_registration']);
+        }
+        
+        if (isset($input['company_address'])) {
+            $sanitized['company_address'] = sanitize_textarea_field($input['company_address']);
+        }
+        
+        if (isset($input['invoice_prefix'])) {
+            $sanitized['invoice_prefix'] = sanitize_text_field($input['invoice_prefix']);
+        }
+        
+        if (isset($input['next_invoice_number'])) {
+            $sanitized['next_invoice_number'] = absint($input['next_invoice_number']);
+        }
+        
+        if (isset($input['default_tax_type'])) {
+            $sanitized['default_tax_type'] = sanitize_text_field($input['default_tax_type']);
+        }
+
+        return $sanitized;
     }
 
-    public function handle_bulk_update() {
-        check_ajax_referer('wc-einvoice-admin', 'nonce');
-
-        if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error('Permission denied');
-        }
-
-        $data = $_POST['data'];
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'wc_einvoice_data';
+    public function sanitize_payment_settings($input) {
+        $sanitized = array();
         
-        foreach ($data as $record) {
-            $wpdb->update(
-                $table_name,
-                array(
-                    'tin_number' => sanitize_text_field($record['tin_number']),
-                    'sst_registration' => sanitize_text_field($record['sst_registration']),
-                    'tax_type' => sanitize_text_field($record['tax_type']),
-                    'tax_exemption_details' => sanitize_textarea_field($record['tax_exemption_details'])
-                ),
-                array('id' => intval($record['id'])),
-                array('%s', '%s', '%s', '%s'),
-                array('%d')
-            );
+        if (isset($input['payment_mode'])) {
+            $sanitized['payment_mode'] = sanitize_text_field($input['payment_mode']);
         }
         
-        wp_send_json_success();
-    }
-
-    public function add_order_columns($columns) {
-        $new_columns = array();
-        
-        foreach ($columns as $key => $title) {
-            $new_columns[$key] = $title;
-            if ($key === 'order_status') {
-                $new_columns['einvoice_status'] = __('E-Invoice Status', 'wc-einvoice');
-            }
+        if (isset($input['bank_details'])) {
+            $sanitized['bank_details'] = sanitize_textarea_field($input['bank_details']);
         }
         
-        return $new_columns;
-    }
-
-    public function add_order_column_content($column) {
-        global $post;
-        
-        if ($column === 'einvoice_status') {
-            $order = wc_get_order($post->ID);
-            $has_einvoice_data = $order->get_meta('_billing_tin') ? true : false;
-            
-            echo $has_einvoice_data 
-                ? '<mark class="yes"><span class="dashicons dashicons-yes"></span></mark>' 
-                : '<mark class="no"><span class="dashicons dashicons-no"></span></mark>';
+        if (isset($input['payment_terms'])) {
+            $sanitized['payment_terms'] = sanitize_textarea_field($input['payment_terms']);
         }
+        
+        if (isset($input['enable_prepayment'])) {
+            $sanitized['enable_prepayment'] = (bool) $input['enable_prepayment'];
+        }
+        
+        if (isset($input['prepayment_percentage'])) {
+            $sanitized['prepayment_percentage'] = min(100, max(0, floatval($input['prepayment_percentage'])));
+        }
+
+        return $sanitized;
     }
 }
-public function __construct() {
-    add_action('admin_init', array($this, 'register_settings'));
-    // ... other existing constructor code
-}
-
-public function register_settings() {
-    register_setting(
-        'wc_einvoice_settings', // Option group
-        'wc_einvoice_settings', // Option name
-        array(
-            'type' => 'array',
-            'sanitize_callback' => array($this, 'sanitize_settings')
-        )
-    );
-
-    register_setting(
-        'wc_einvoice_payment_settings', // Option group
-        'wc_einvoice_payment_settings', // Option name
-        array(
-            'type' => 'array',
-            'sanitize_callback' => array($this, 'sanitize_payment_settings')
-        )
-    );
-}
-
-public function sanitize_settings($input) {
-    $sanitized = array();
-    
-    if (isset($input['company_name'])) {
-        $sanitized['company_name'] = sanitize_text_field($input['company_name']);
-    }
-    
-    if (isset($input['tax_registration'])) {
-        $sanitized['tax_registration'] = sanitize_text_field($input['tax_registration']);
-    }
-    
-    if (isset($input['company_address'])) {
-        $sanitized['company_address'] = sanitize_textarea_field($input['company_address']);
-    }
-    
-    if (isset($input['invoice_prefix'])) {
-        $sanitized['invoice_prefix'] = sanitize_text_field($input['invoice_prefix']);
-    }
-    
-    if (isset($input['next_invoice_number'])) {
-        $sanitized['next_invoice_number'] = absint($input['next_invoice_number']);
-    }
-    
-    if (isset($input['default_tax_type'])) {
-        $sanitized['default_tax_type'] = sanitize_text_field($input['default_tax_type']);
-    }
-
-    return $sanitized;
-}
-
-public function sanitize_payment_settings($input) {
-    $sanitized = array();
-    
-    if (isset($input['payment_mode'])) {
-        $sanitized['payment_mode'] = sanitize_text_field($input['payment_mode']);
-    }
-    
-    if (isset($input['bank_details'])) {
-        $sanitized['bank_details'] = sanitize_textarea_field($input['bank_details']);
-    }
-    
-    if (isset($input['payment_terms'])) {
-        $sanitized['payment_terms'] = sanitize_textarea_field($input['payment_terms']);
-    }
-    
-    if (isset($input['enable_prepayment'])) {
-        $sanitized['enable_prepayment'] = (bool) $input['enable_prepayment'];
-    }
-    
-    if (isset($input['prepayment_percentage'])) {
-        $sanitized['prepayment_percentage'] = min(100, max(0, floatval($input['prepayment_percentage'])));
-    }
-
-    return $sanitized;
-}
-
