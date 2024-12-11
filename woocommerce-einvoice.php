@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: WooCommerce E-Invoice Extension
+ * Plugin Name: WooCommerce E-Invoice
  * Plugin URI: 
  * Description: Extends WooCommerce checkout with additional fields required for Malaysian e-invoicing
  * Version: 1.0.0
